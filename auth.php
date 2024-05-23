@@ -103,7 +103,7 @@ class auth_plugin_jwt extends auth_plugin_base {
     }
 
     private function attempt_jwt_login() {
-        global $CFG, $DB;
+        global $CFG, $DB, $SESSION;
 
         $authHeader = null;
 
@@ -173,7 +173,7 @@ class auth_plugin_jwt extends auth_plugin_base {
             if ($client != $clientExpected)
                 return;
         }
-
+        $expectedUsername = $this->get_expected_username($payload);
         $userExists = $DB->record_exists('user', ["email" => $payload->email]);
 
         if (!$userExists) {
@@ -210,7 +210,6 @@ class auth_plugin_jwt extends auth_plugin_base {
         }
         else {
             $existingUser = $DB->get_record("user", ["email" => $payload->email]);
-            $expectedUsername = $this->get_expected_username($payload);
 
             if ($existingUser->username != $expectedUsername) {
                 $existingUser->username = $expectedUsername;
@@ -226,12 +225,17 @@ class auth_plugin_jwt extends auth_plugin_base {
          * so if that doesn't happen then something else failed above.
          */
         complete_user_login($updatedUser);
+
+        /**
+         * Store SSO username in session.
+         */
+        $SESSION->sso_username = $expectedUsername;
     }
 
     /**
      * Use the information provided in the cert + environment variables to determine
      * the expected username for this account.
-     * 
+     *
      * If nothing is set to manipulate this, it will return the 'preferred_username'
      * property with no modifications.
      */
